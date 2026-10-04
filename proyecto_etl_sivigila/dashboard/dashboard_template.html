@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel ETL SIVIGILA — Dengue, IRAG y Tuberculosis</title>
+<style>
+  :root{
+    --bg:#EEF2F4; --panel:#FFFFFF; --ink:#16222B; --sub:#5B6B73; --line:#DCE4E7;
+    --navy:#14374A;
+    --dengue:#D85A30; --irag:#2E7FA6; --tb:#3B8B61;
+    --ok:#2F8F5B; --warn:#C8862B; --bad:#C24A4A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+  header{background:var(--navy);color:#EAF1F4;padding:22px 28px;}
+  header h1{margin:0;font-size:1.35rem;font-weight:700;letter-spacing:.2px;}
+  header p{margin:4px 0 0;color:#B9CDD6;font-size:.88rem;}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 20px 60px;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;}
+  .kpi .v{font-size:1.55rem;font-weight:700;color:var(--navy);}
+  .kpi .l{font-size:.78rem;color:var(--sub);margin-top:2px;}
+  .controls{display:flex;align-items:center;gap:12px;margin:8px 0 18px;flex-wrap:wrap;}
+  .controls label{font-size:.82rem;color:var(--sub);}
+  select{font:inherit;font-size:.9rem;padding:7px 10px;border-radius:7px;border:1px solid var(--line);background:#fff;color:var(--ink);}
+  .grid{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;}
+  .grid.full{grid-template-columns:1fr;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px 10px;margin-bottom:16px;}
+  .panel h2{margin:0 0 2px;font-size:.98rem;font-weight:700;}
+  .panel .hint{font-size:.78rem;color:var(--sub);margin-bottom:10px;}
+  .chartbox{width:100%;}
+  .chartbox svg{width:100%;height:auto;display:block;font-family:inherit;}
+  .axis line, .axis path{stroke:#C7D1D5;stroke-width:1;}
+  .gridline{stroke:#EBEFF1;stroke-width:1;}
+  .tick-label{fill:var(--sub);font-size:10px;}
+  .legend-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:.78rem;color:var(--sub);}
+  .legend-row span{display:inline-flex;align-items:center;gap:5px;}
+  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block;}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);}
+  th{color:var(--sub);font-weight:600;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:600;}
+  .pill.ok{background:#E3F3E9;color:var(--ok);}
+  .pill.bad{background:#FBE7E7;color:var(--bad);}
+
+  .loader{background:#FFF9EC;border:1px solid #F0DCA6;border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;}
+  .loader h2{margin:0 0 2px;font-size:.98rem;font-weight:700;color:#7A5B16;}
+  .loader .hint{font-size:.8rem;color:#8A6B23;margin-bottom:12px;}
+  .loader-row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:5px;font-size:.78rem;color:#5B4A1C;}
+  .field input[type=file]{font-size:.78rem;max-width:230px;}
+  .field .req{color:var(--bad);font-weight:700;}
+  #loaderStatus{margin-top:10px;font-size:.82rem;font-weight:600;}
+  #loaderStatus.ok{color:var(--ok);}
+  #loaderStatus.bad{color:var(--bad);}
+  #loaderStatus.busy{color:#8A6B23;}
+  .badge-demo{display:inline-block;background:#FBF0DE;color:var(--warn);font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:99px;margin-left:8px;vertical-align:middle;}
+  .nodata{color:var(--sub);font-size:.82rem;padding:20px 0;text-align:center;}
+
+  @media (max-width:860px){ .grid{grid-template-columns:1fr;} .kpis{grid-template-columns:repeat(2,1fr);} }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Panel ETL — Vigilancia SIVIGILA 2018-2022</h1>
+  <p>Dengue · IRAG inusitada · Tuberculosis (todas las formas) — consolidado desde 5 reportes rutinarios del INS</p>
+</header>
+
+<div class="wrap">
+
+  <details class="loader">
+    <summary style="cursor:pointer;font-weight:700;color:#7A5B16">Cargar otros archivos (opcional)</summary>
+    <div class="hint" style="margin-top:8px">Este panel ya incluye los resultados de la última ejecución del pipeline. Si quieres explorar otra corrida, carga aquí su <code>casos_objetivo.csv</code> (data/gold/); el procesamiento ocurre en tu navegador, sin conexión a internet.</div>
+    <div class="loader-row">
+      <div class="field">
+        <span><span class="req">●</span> casos_objetivo.csv &nbsp;<small>(data/gold/)</small></span>
+        <input type="file" id="fileHechos" accept=".csv">
+      </div>
+      <div class="field">
+        <span>reporte_calidad_datos.json &nbsp;<small>(data/gold/, opcional)</small></span>
+        <input type="file" id="fileCalidad" accept=".json">
+      </div>
+      <div class="field">
+        <span>metadata_extraccion.json &nbsp;<small>(data/bronze/, opcional)</small></span>
+        <input type="file" id="fileExtraccion" accept=".json">
+      </div>
+    </div>
+    <div id="loaderStatus" class="busy">Mostrando los datos incrustados por el pipeline.</div>
+  </details>
+
+  <div class="kpis" id="kpiRow"></div>
+
+  <div class="controls">
+    <label for="eventoSel">Evento</label>
+    <select id="eventoSel"></select>
+    <label for="anioSel">Año (serie semanal)</label>
+    <select id="anioSel"></select>
+    <span id="demoBadge" class="badge-demo" style="display:none"></span>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Casos por semana epidemiológica</h2>
+      <div class="hint">Evento y año seleccionados arriba</div>
+      <div class="chartbox" id="chartSemanal"></div>
+    </div>
+    <div class="panel">
+      <h2>Casos totales por año</h2>
+      <div class="hint">Comparación entre los tres eventos</div>
+      <div class="chartbox" id="chartAnual"></div>
+      <div class="legend-row" id="legendAnual"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Índice estacional mensual</h2>
+      <div class="hint">Base 100 = promedio anual de cada evento</div>
+      <div class="chartbox" id="chartEstacional"></div>
+      <div class="legend-row" id="legendEstacional"></div>
+    </div>
+    <div class="panel">
+      <h2>Top departamentos</h2>
+      <div class="hint">Acumulado del periodo cargado, evento seleccionado</div>
+      <div class="chartbox" id="chartDeptos"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Coeficiente de variación mensual (%)</h2>
+    <div class="hint">Por evento y año — insumo para las pruebas de hipótesis de estacionalidad</div>
+    <table id="tablaCV"></table>
+  </div>
+
+  <div class="grid full" id="gridAdvertencias" style="display:none">
+    <div class="panel" style="border-color:#F0DCA6;background:#FFFBF2">
+      <h2>Advertencias de calidad</h2>
+      <div class="hint">Puntos que el pipeline detectó y que conviene resolver o tener presentes al interpretar los resultados</div>
+      <ul id="listaAdvertencias" style="margin:6px 0 10px;padding-left:18px;font-size:.84rem;line-height:1.5"></ul>
+    </div>
+  </div>
+
+  <div class="grid full">
+    <div class="panel">
+      <h2>Calidad de los datos (auditoría del pipeline)</h2>
+      <div class="hint">Métricas de la etapa Transform, alineadas con los KPI del proyecto</div>
+      <table id="tablaCalidad"></table>
+    </div>
+  </div>
+
+  <div class="grid full">
+    <div class="panel">
+      <h2>Registro de extracción por archivo</h2>
+      <div class="hint">Resultado de la etapa Extract para cada archivo rutinaria_AAAA.xlsx</div>
+      <table id="tablaExtraccion">
+        <thead><tr><th>Año</th><th>Archivo</th><th>Hoja / estrategia</th><th>Fila encabezado</th><th>Filas crudas</th><th>Estado</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <p style="color:var(--sub);font-size:.78rem;text-align:center;margin-top:30px;">Pipeline ETL reproducible — SIVIGILA (INS) 2018-2022 · dengue, IRAG inusitada y tuberculosis (todas las formas)</p>
+</div>
+
+<script>
+const PIPELINE_DATA = /*__DATA_JSON__*/null;
+const COLORS = { 'DENGUE': '#D85A30', 'IRAG INUSITADA': '#2E7FA6', 'TUBERCULOSIS (TODAS LAS FORMAS)': '#3B8B61' };
+const LABELS = { 'DENGUE': 'Dengue', 'IRAG INUSITADA': 'IRAG inusitada', 'TUBERCULOSIS (TODAS LAS FORMAS)': 'Tuberculosis (todas las formas)' };
+const EVENTOS = Object.keys(LABELS);
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const NO_TERRITORIALES = new Set(['EXTERIOR','PROCEDENCIA DESCONOCIDA','DESCONOCIDO']);
+
+let DATA = PIPELINE_DATA;
+
+function fmt(n){ return new Intl.NumberFormat('es-CO').format(Math.round(n)); }
+function stddev(arr){
+  const n = arr.length; if(n < 2) return 0;
+  const m = arr.reduce((a,b)=>a+b,0)/n;
+  return Math.sqrt(arr.reduce((s,x)=>s+(x-m)*(x-m),0)/(n-1));
+}
+
+// ============================================================
+// Parser CSV minimo (sin dependencias). Soporta comillas basicas.
+// ============================================================
+function parseCSV(text){
+  const lines = text.replace(/\r\n/g,'\n').split('\n').filter(l => l.length > 0);
+  if(!lines.length) return [];
+  const splitLine = (line) => {
+    const out = []; let cur = ''; let inQuotes = false;
+    for(let i=0;i<line.length;i++){
+      const c = line[i];
+      if(c === '"'){ inQuotes = !inQuotes; continue; }
+      if(c === ',' && !inQuotes){ out.push(cur); cur=''; continue; }
+      cur += c;
+    }
+    out.push(cur);
+    return out;
+  };
+  const headers = splitLine(lines[0]).map(h => h.trim());
+  const rows = [];
+  for(let i=1;i<lines.length;i++){
+    const cells = splitLine(lines[i]);
+    const row = {};
+    headers.forEach((h,idx) => {
+      const raw = cells[idx] === undefined ? '' : cells[idx].trim();
+      if(raw === ''){ row[h] = ''; }
+      else if(!isNaN(raw) && raw !== ''){ row[h] = +raw; }
+      else { row[h] = raw; }
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+
+// ============================================================
+// Mini libreria de graficos SVG (sin dependencias externas)
+// ============================================================
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const CHART_W = 640, CHART_H = 280;
+const MARGIN = {top: 14, right: 16, bottom: 28, left: 44};
+
+function niceTicks(min, max, count){
+  if(min === max){ max = min + 1; }
+  const span = max - min;
+  const step0 = span / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const residual = step0 / mag;
+  let step;
+  if(residual > 5) step = 10*mag; else if(residual > 2) step = 5*mag; else if(residual > 1) step = 2*mag; else step = mag;
+  const niceMin = Math.floor(min/step)*step;
+  const niceMax = Math.ceil(max/step)*step;
+  const ticks = [];
+  for(let v = niceMin; v <= niceMax + 1e-9; v += step) ticks.push(Math.round(v*1000)/1000);
+  return ticks;
+}
+
+function svgEl(tag, attrs){
+  const el = document.createElementNS(SVG_NS, tag);
+  for(const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+function emptyState(container, msg){
+  container.innerHTML = '<div class="nodata">' + (msg || 'No hay datos para esta selección.') + '</div>';
+}
+
+// Grafico de lineas; series: [{name,color,values:[num,...]}]; xLabels: [str,...]
+function drawLineChart(containerId, series, xLabels, opts){
+  opts = opts || {};
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const allVals = series.flatMap(s => s.values).filter(v => typeof v === 'number' && !isNaN(v));
+  if(!allVals.length || !xLabels.length){ emptyState(container); return; }
+  const yMin = opts.beginAtZero ? Math.min(0, ...allVals) : Math.min(...allVals);
+  const yMax = Math.max(...allVals);
+  const yTicks = niceTicks(yMin, yMax, 5);
+  const yLo = yTicks[0], yHi = yTicks[yTicks.length-1];
+
+  const plotW = CHART_W - MARGIN.left - MARGIN.right;
+  const plotH = CHART_H - MARGIN.top - MARGIN.bottom;
+  const n = xLabels.length;
+  const xAt = (i) => MARGIN.left + (n <= 1 ? 0 : (i/(n-1)) * plotW);
+  const yAt = (v) => MARGIN.top + plotH - ((v - yLo) / (yHi - yLo || 1)) * plotH;
+
+  const svg = svgEl('svg', {viewBox: `0 0 ${CHART_W} ${CHART_H}`, preserveAspectRatio:'xMidYMid meet'});
+
+  yTicks.forEach(t => {
+    svg.appendChild(svgEl('line', {x1:MARGIN.left, x2:CHART_W-MARGIN.right, y1:yAt(t), y2:yAt(t), class:'gridline'}));
+    const lbl = svgEl('text', {x:MARGIN.left-6, y:yAt(t)+3, 'text-anchor':'end', class:'tick-label'});
+    lbl.textContent = fmt(t);
+    svg.appendChild(lbl);
+  });
+
+  const xTickStep = Math.max(1, Math.ceil(n/10));
+  xLabels.forEach((lab, i) => {
+    if(i % xTickStep !== 0 && i !== n-1) return;
+    const lbl = svgEl('text', {x:xAt(i), y:CHART_H-MARGIN.bottom+16, 'text-anchor':'middle', class:'tick-label'});
+    lbl.textContent = lab;
+    svg.appendChild(lbl);
+  });
+
+  svg.appendChild(svgEl('line', {x1:MARGIN.left, x2:MARGIN.left, y1:MARGIN.top, y2:CHART_H-MARGIN.bottom, class:'axis'}));
+  svg.appendChild(svgEl('line', {x1:MARGIN.left, x2:CHART_W-MARGIN.right, y1:CHART_H-MARGIN.bottom, y2:CHART_H-MARGIN.bottom, class:'axis'}));
+
+  series.forEach(s => {
+    let d = '';
+    s.values.forEach((v,i) => {
+      if(v === null || v === undefined || isNaN(v)) return;
+      d += (d === '' ? 'M' : 'L') + xAt(i).toFixed(1) + ',' + yAt(v).toFixed(1) + ' ';
+    });
+    if(d) svg.appendChild(svgEl('path', {d:d.trim(), fill:'none', stroke:s.color, 'stroke-width':2, 'stroke-linejoin':'round', 'stroke-linecap':'round'}));
+    s.values.forEach((v,i) => {
+      if(v === null || v === undefined || isNaN(v)) return;
+      svg.appendChild(svgEl('circle', {cx:xAt(i), cy:yAt(v), r: n > 30 ? 0 : 2.5, fill:s.color}));
+    });
+  });
+
+  container.appendChild(svg);
+}
+
+// Grafico de barras agrupadas; categories:[str]; series:[{name,color,values:[num]}]
+function drawGroupedBarChart(containerId, categories, series){
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const allVals = series.flatMap(s => s.values);
+  if(!categories.length || !allVals.length){ emptyState(container); return; }
+  const yTicks = niceTicks(0, Math.max(...allVals), 5);
+  const yHi = yTicks[yTicks.length-1];
+
+  const plotW = CHART_W - MARGIN.left - MARGIN.right;
+  const plotH = CHART_H - MARGIN.top - MARGIN.bottom;
+  const groupW = plotW / categories.length;
+  const barW = Math.min(26, groupW / (series.length+1));
+  const yAt = (v) => MARGIN.top + plotH - (v/(yHi||1))*plotH;
+
+  const svg = svgEl('svg', {viewBox:`0 0 ${CHART_W} ${CHART_H}`, preserveAspectRatio:'xMidYMid meet'});
+
+  yTicks.forEach(t => {
+    svg.appendChild(svgEl('line', {x1:MARGIN.left, x2:CHART_W-MARGIN.right, y1:yAt(t), y2:yAt(t), class:'gridline'}));
+    const lbl = svgEl('text', {x:MARGIN.left-6, y:yAt(t)+3, 'text-anchor':'end', class:'tick-label'});
+    lbl.textContent = fmt(t);
+    svg.appendChild(lbl);
+  });
+
+  categories.forEach((cat, ci) => {
+    const groupCenter = MARGIN.left + groupW*ci + groupW/2;
+    const lbl = svgEl('text', {x:groupCenter, y:CHART_H-MARGIN.bottom+16, 'text-anchor':'middle', class:'tick-label'});
+    lbl.textContent = cat;
+    svg.appendChild(lbl);
+
+    series.forEach((s, si) => {
+      const v = s.values[ci] || 0;
+      const bx = groupCenter - (series.length*barW)/2 + si*barW;
+      const by = yAt(v);
+      svg.appendChild(svgEl('rect', {x:bx, y:by, width:barW-2, height:(CHART_H-MARGIN.bottom)-by, fill:s.color, rx:1.5}));
+    });
+  });
+
+  svg.appendChild(svgEl('line', {x1:MARGIN.left, x2:MARGIN.left, y1:MARGIN.top, y2:CHART_H-MARGIN.bottom, class:'axis'}));
+  svg.appendChild(svgEl('line', {x1:MARGIN.left, x2:CHART_W-MARGIN.right, y1:CHART_H-MARGIN.bottom, y2:CHART_H-MARGIN.bottom, class:'axis'}));
+
+  container.appendChild(svg);
+}
+
+// Grafico de barras horizontales; categories:[str]; values:[num]; color
+function drawHBarChart(containerId, categories, values, color){
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  if(!categories.length){ emptyState(container); return; }
+  const h = Math.max(180, categories.length * 26 + 30);
+  const plotW = CHART_W - MARGIN.left - 70;
+  const xTicks = niceTicks(0, Math.max(...values, 1), 4);
+  const xHi = xTicks[xTicks.length-1];
+  const rowH = (h - 20) / categories.length;
+  const xAt = (v) => MARGIN.left + (v/(xHi||1))*plotW;
+
+  const svg = svgEl('svg', {viewBox:`0 0 ${CHART_W} ${h}`, preserveAspectRatio:'xMidYMid meet'});
+
+  xTicks.forEach(t => {
+    svg.appendChild(svgEl('line', {x1:xAt(t), x2:xAt(t), y1:8, y2:h-14, class:'gridline'}));
+    const lbl = svgEl('text', {x:xAt(t), y:h-2, 'text-anchor':'middle', class:'tick-label'});
+    lbl.textContent = fmt(t);
+    svg.appendChild(lbl);
+  });
+
+  categories.forEach((cat, i) => {
+    const y = 10 + i*rowH;
+    const barH = Math.min(18, rowH*0.6);
+    const v = values[i];
+    svg.appendChild(svgEl('text', {x:MARGIN.left-6, y:y+barH*0.75, 'text-anchor':'end', class:'tick-label'})).textContent = cat;
+    svg.appendChild(svgEl('rect', {x:MARGIN.left, y:y, width:Math.max(1,xAt(v)-MARGIN.left), height:barH, fill:color, rx:2}));
+    const vlab = svgEl('text', {x:xAt(v)+5, y:y+barH*0.75, class:'tick-label'});
+    vlab.textContent = fmt(v);
+    svg.appendChild(vlab);
+  });
+
+  container.appendChild(svg);
+}
+
+function renderLegend(containerId, items){
+  const el = document.getElementById(containerId);
+  el.innerHTML = items.map(it => `<span><span class="swatch" style="background:${it.color}"></span>${it.name}</span>`).join('');
+}
+
+// ============================================================
+// Recalculo de agregados a partir de hecho_casos.csv (filas crudas)
+// ============================================================
+function agregarDesdeHechos(rows){
+  const semanalMap = new Map(), anualMap = new Map(), mensualMap = new Map(), deptoMap = new Map();
+
+  rows.forEach(r=>{
+    const ev = (r.evento||'').toString().trim();
+    if(!EVENTOS.includes(ev)) return;
+    const anio = +r.anio, semana = +r.semana, casos = +r.casos || 0;
+    const mes = (r.mes !== undefined && r.mes !== '') ? +r.mes : Math.min(12, Math.floor((semana-1)*12/52)+1);
+
+    const ks = `${ev}|${anio}|${semana}`;
+    semanalMap.set(ks, (semanalMap.get(ks)||0) + casos);
+
+    const ka = `${ev}|${anio}`;
+    anualMap.set(ka, (anualMap.get(ka)||0) + casos);
+
+    const km = `${ev}|${anio}|${mes}`;
+    mensualMap.set(km, (mensualMap.get(km)||0) + casos);
+
+    const dep = (r.departamento||'').toString().trim();
+    if(dep && !NO_TERRITORIALES.has(dep)){
+      const kd = `${ev}|${dep}`;
+      deptoMap.set(kd, (deptoMap.get(kd)||0) + casos);
+    }
+  });
+
+  const semanal = [...semanalMap.entries()].map(([k,casos])=>{ const [evento,anio,semana]=k.split('|'); return {evento, anio:+anio, semana:+semana, casos}; });
+  const anual = [...anualMap.entries()].map(([k,casos])=>{ const [evento,anio]=k.split('|'); return {evento, anio:+anio, casos}; });
+
+  const totMes = new Map();
+  mensualMap.forEach((casos,k)=>{ const [evento,anio,mes]=k.split('|'); const kk=`${evento}|${mes}`; totMes.set(kk, (totMes.get(kk)||0)+casos); });
+  const mesesSet = new Set();
+  const porEvento = {};
+  EVENTOS.forEach(ev=>porEvento[ev]={});
+  totMes.forEach((casos,k)=>{ const [evento,mes]=k.split('|'); porEvento[evento][mes]=casos; mesesSet.add(+mes); });
+  const meses = [...mesesSet].sort((a,b)=>a-b);
+  const seriesIdx = {};
+  EVENTOS.forEach(ev=>{
+    const vals = meses.map(m=>porEvento[ev][m]||0);
+    const media = vals.reduce((a,b)=>a+b,0)/(vals.length||1);
+    seriesIdx[ev] = vals.map(v=> media>0 ? Math.round((v/media*100)*10)/10 : 0);
+  });
+
+  const cvGroups = new Map();
+  mensualMap.forEach((casos,k)=>{ const [evento,anio,mes]=k.split('|'); const kk=`${evento}|${anio}`; if(!cvGroups.has(kk)) cvGroups.set(kk,[]); cvGroups.get(kk).push(casos); });
+  const cv = [...cvGroups.entries()].map(([k,vals])=>{
+    const [evento,anio] = k.split('|');
+    const media = vals.reduce((a,b)=>a+b,0)/vals.length;
+    const sd = stddev(vals);
+    return { evento, anio:+anio, media:Math.round(media*100)/100, sd:Math.round(sd*100)/100, cv_pct: media>0 ? Math.round((sd/media*100)*10)/10 : 0 };
+  });
+
+  const top_departamentos = [];
+  const porEvDepto = {}; EVENTOS.forEach(ev=>porEvDepto[ev]=[]);
+  deptoMap.forEach((casos,k)=>{ const [evento,departamento]=k.split('|'); if(porEvDepto[evento]) porEvDepto[evento].push({evento,departamento,casos}); });
+  EVENTOS.forEach(ev=>{ porEvDepto[ev].sort((a,b)=>b.casos-a.casos).slice(0,8).forEach(r=>top_departamentos.push(r)); });
+
+  const departamentosUnicos = new Set(rows.map(r=>(r.departamento||'').toString().trim()).filter(Boolean));
+  const territorioValido = rows.filter(r=>!NO_TERRITORIALES.has((r.departamento||'').toString().trim())).length;
+
+  return {
+    semanal, anual,
+    indice_estacional: { meses, series: seriesIdx },
+    top_departamentos,
+    cv,
+    calidad_calculada: {
+      filas_finales: rows.length,
+      departamentos_unicos: departamentosUnicos.size,
+      pct_registros_territorio_valido: rows.length ? Math.round(territorioValido/rows.length*10000)/100 : 0,
+    },
+  };
+}
+
+// ============================================================
+// Carga de archivos locales
+// ============================================================
+const status = document.getElementById('loaderStatus');
+function setStatus(msg, cls){ status.textContent = msg; status.className = cls; }
+
+let calidadCargada = null;
+
+document.getElementById('fileHechos').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  setStatus('Procesando ' + file.name + '…', 'busy');
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const rows = parseCSV(ev.target.result);
+      if(!rows.length || !('evento' in rows[0])){
+        setStatus('El archivo no parece ser un casos_objetivo.csv válido (falta la columna "evento").', 'bad');
+        return;
+      }
+      const recalculado = agregarDesdeHechos(rows);
+      const nuevaCalidad = Object.assign(
+        { filas_extraidas_total: '—', filas_subtotal_removidas: '—', filas_duplicadas_removidas: '—', filas_rango_invalido_removidas: '—',
+          eventos_unicos_tras_homologacion: '—', cobertura_anios: [...new Set(rows.map(r=>r.anio))].sort(),
+          pct_registros_con_poblacion: rows.some(r=>r.poblacion) ? '—' : 0 },
+        calidadCargada || {},
+        recalculado.calidad_calculada
+      );
+      DATA = Object.assign({}, DATA, recalculado, { calidad: nuevaCalidad });
+      document.getElementById('demoBadge').style.display = 'none';
+      setStatus('✓ ' + fmt(rows.length) + ' filas cargadas desde ' + file.name + '. Mostrando tus resultados.', 'ok');
+      renderAll();
+    }catch(err){
+      setStatus('Error leyendo el archivo: ' + err.message, 'bad');
+    }
+  };
+  reader.onerror = function(){ setStatus('No se pudo leer el archivo.', 'bad'); };
+  reader.readAsText(file);
+});
+
+document.getElementById('fileCalidad').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const crudo = JSON.parse(ev.target.result);
+      // El reporte de Silver (metodologia Medallion) usa filas_bronze/filas_silver;
+      // se alian a los nombres que usa el resto del panel (filas_extraidas_total/filas_finales).
+      calidadCargada = Object.assign({}, crudo, {
+        filas_extraidas_total: crudo.filas_extraidas_total ?? crudo.filas_bronze,
+        filas_finales: crudo.filas_finales ?? crudo.filas_silver,
+      });
+      DATA.calidad = Object.assign({}, DATA.calidad, calidadCargada);
+      renderKPIs(); renderTablaCalidad();
+      setStatus('✓ reporte_calidad_datos.json cargado.', 'ok');
+    }catch(err){ setStatus('El archivo de calidad no es un JSON válido.', 'bad'); }
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('fileExtraccion').addEventListener('change', function(e){
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      DATA.extraccion = JSON.parse(ev.target.result);
+      renderTablaExtraccion();
+      setStatus('✓ metadata_extraccion.json cargado.', 'ok');
+    }catch(err){ setStatus('El archivo de extracción no es un JSON válido.', 'bad'); }
+  };
+  reader.readAsText(file);
+});
+
+// ============================================================
+// Render
+// ============================================================
+const eventoSel = document.getElementById('eventoSel');
+const anioSel = document.getElementById('anioSel');
+
+function renderKPIs(){
+  const c = DATA.calidad || {};
+  const totalCasos = DATA.anual.reduce((s,r)=>s+r.casos,0);
+  const cvProm = {};
+  DATA.cv.forEach(r=>{ cvProm[r.evento] = cvProm[r.evento] || []; cvProm[r.evento].push(r.cv_pct); });
+  let masDisperso = EVENTOS[0], maxCv = -1;
+  EVENTOS.forEach(ev=>{ const arr = cvProm[ev]||[0]; const m = arr.reduce((a,b)=>a+b,0)/arr.length; if(m>maxCv){maxCv=m; masDisperso=ev;} });
+
+  const esNum = v => typeof v === 'number' && !isNaN(v);
+  const kpis = [
+    {v: fmt(totalCasos), l: 'Casos totales (3 eventos, periodo cargado)'},
+    {v: LABELS[masDisperso], l: 'Mayor dispersión mensual promedio (' + maxCv.toFixed(0) + '% CV)'},
+    {v: (esNum(c.filas_finales)?fmt(c.filas_finales):'—') + ' / ' + (esNum(c.filas_extraidas_total) ? fmt(c.filas_extraidas_total) : '—'), l: 'Registros finales / extraídos'},
+    {v: (esNum(c.pct_registros_territorio_valido) ? c.pct_registros_territorio_valido : '—') + '%', l: 'Registros con territorio válido'},
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(k=>`<div class="kpi"><div class="v">${k.v}</div><div class="l">${k.l}</div></div>`).join('');
+}
+
+function renderSelectores(){
+  eventoSel.innerHTML = EVENTOS.map(e=>`<option value="${e}">${LABELS[e]}</option>`).join('');
+  const anios = [...new Set(DATA.semanal.map(r=>r.anio))].sort();
+  anioSel.innerHTML = anios.map(a=>`<option value="${a}">${a}</option>`).join('');
+  if(anios.length) anioSel.value = anios[anios.length-1];
+}
+
+function drawSemanal(){
+  const ev = eventoSel.value, anio = parseInt(anioSel.value);
+  const rows = DATA.semanal.filter(r=>r.evento===ev && r.anio===anio).sort((a,b)=>a.semana-b.semana);
+  drawLineChart('chartSemanal',
+    [{name: LABELS[ev], color: COLORS[ev], values: rows.map(r=>r.casos)}],
+    rows.map(r=>String(r.semana)),
+    {beginAtZero:true}
+  );
+}
+
+function drawAnual(){
+  const anios = [...new Set(DATA.anual.map(r=>r.anio))].sort();
+  const series = EVENTOS.map(ev => ({
+    name: LABELS[ev], color: COLORS[ev],
+    values: anios.map(a => (DATA.anual.find(r=>r.evento===ev && r.anio===a)||{casos:0}).casos)
+  }));
+  drawGroupedBarChart('chartAnual', anios.map(String), series);
+  renderLegend('legendAnual', EVENTOS.map(ev=>({name:LABELS[ev], color:COLORS[ev]})));
+}
+
+function drawEstacional(){
+  const ie = DATA.indice_estacional;
+  const series = EVENTOS.map(ev => ({ name: LABELS[ev], color: COLORS[ev], values: ie.series[ev] || [] }));
+  drawLineChart('chartEstacional', series, ie.meses.map(m=>MESES[m-1]), {});
+  renderLegend('legendEstacional', EVENTOS.map(ev=>({name:LABELS[ev], color:COLORS[ev]})));
+}
+
+function drawDeptos(){
+  const ev = eventoSel.value;
+  const rows = DATA.top_departamentos.filter(r=>r.evento===ev).sort((a,b)=>b.casos-a.casos);
+  drawHBarChart('chartDeptos', rows.map(r=>r.departamento), rows.map(r=>r.casos), COLORS[ev]);
+}
+
+function renderTablaCV(){
+  const anios2 = [...new Set(DATA.cv.map(r=>r.anio))].sort();
+  let thead = '<thead><tr><th>Evento</th>' + anios2.map(a=>`<th>${a}</th>`).join('') + '</tr></thead>';
+  let rows = EVENTOS.map(ev=>{
+    const cells = anios2.map(a=>{ const r = DATA.cv.find(x=>x.evento===ev && x.anio===a); return `<td>${r? r.cv_pct+'%':'—'}</td>`; }).join('');
+    return `<tr><td>${LABELS[ev]}</td>${cells}</tr>`;
+  }).join('');
+  document.getElementById('tablaCV').innerHTML = thead + '<tbody>'+rows+'</tbody>';
+}
+
+function esNum(v){ return typeof v === 'number' && !isNaN(v); }
+function ovG(v){ return esNum(v) ? fmt(v) : '— (carga reporte_calidad_datos.json)'; }
+
+function renderTablaCalidad(){
+  const c = DATA.calidad || {};
+  const items = [
+    ['Filas extraídas (crudo, todos los eventos)', ovG(c.filas_extraidas_total)],
+    ['Filas de subtotal removidas (tablas dinámicas de origen)', ovG(c.filas_subtotal_removidas)],
+    ['Filas duplicadas removidas', ovG(c.filas_duplicadas_removidas)],
+    ['Filas con rango inválido removidas', ovG(c.filas_rango_invalido_removidas)],
+    ['Filas finales en el dataset analítico', esNum(c.filas_finales) ? fmt(c.filas_finales) : '—'],
+    ['% de registros con territorio válido', esNum(c.pct_registros_territorio_valido) ? c.pct_registros_territorio_valido + '%' : '—'],
+    ['% de registros con población asociada (tasa de incidencia)', esNum(c.pct_registros_con_poblacion) ? c.pct_registros_con_poblacion + (c.pct_registros_con_poblacion===0?'% — pendiente de cargar el archivo oficial DANE':'%') : '— (carga reporte_calidad_datos.json)'],
+    ['Eventos únicos tras homologación', esNum(c.eventos_unicos ?? c.eventos_unicos_tras_homologacion) ? (c.eventos_unicos ?? c.eventos_unicos_tras_homologacion) : '—'],
+    ['Departamentos únicos', esNum(c.departamentos_unicos) ? c.departamentos_unicos : '—'],
+    ['Cobertura temporal', (c.cobertura_anios && c.cobertura_anios.length) ? c.cobertura_anios.join(', ') : '—'],
+  ];
+  document.getElementById('tablaCalidad').innerHTML = '<tbody>' + items.map(([l,v])=>`<tr><td>${l}</td><td style="text-align:right;font-weight:600">${v}</td></tr>`).join('') + '</tbody>';
+}
+
+function renderTablaExtraccion(){
+  const ex = DATA.extraccion;
+  const tbody = document.querySelector('#tablaExtraccion tbody');
+  if(!ex){ tbody.innerHTML = '<tr><td colspan="6" style="color:var(--sub)">Carga metadata_extraccion.json (data/bronze/) para ver este registro.</td></tr>'; return; }
+  const body = Object.keys(ex).sort().map(anio=>{
+    const r = ex[anio];
+    const pill = r.estado==='ok' ? '<span class="pill ok">ok</span>' : '<span class="pill bad">error</span>';
+    return `<tr><td>${anio}</td><td>${r.archivo}</td><td>${r.hoja||'—'}${r.estrategia?' <small style="color:var(--sub)">('+r.estrategia+')</small>':''}</td><td>${r.fila_encabezado!=null?r.fila_encabezado:'—'}</td><td>${r.filas_crudas?fmt(r.filas_crudas):'—'}</td><td>${pill}</td></tr>`
+      + (r.advertencia ? `<tr><td colspan="6" style="color:var(--warn);font-size:.78rem">⚠ ${r.advertencia}</td></tr>` : '');
+  }).join('');
+  tbody.innerHTML = body;
+}
+
+function renderAdvertencias(){
+  const adv = (DATA.calidad && DATA.calidad.advertencias) || [];
+  document.getElementById('gridAdvertencias').style.display = adv.length ? '' : 'none';
+  document.getElementById('listaAdvertencias').innerHTML = adv.map(a=>`<li>${String(a).replace(/</g,'&lt;')}</li>`).join('');
+}
+
+function renderAll(){
+  renderSelectores();
+  renderKPIs();
+  drawSemanal(); drawAnual(); drawEstacional(); drawDeptos();
+  renderTablaCV();
+  renderTablaCalidad();
+  renderTablaExtraccion();
+  renderAdvertencias();
+}
+
+eventoSel.addEventListener('change', ()=>{ drawSemanal(); drawDeptos(); });
+anioSel.addEventListener('change', drawSemanal);
+
+renderAll();
+</script>
+</body>
+</html>

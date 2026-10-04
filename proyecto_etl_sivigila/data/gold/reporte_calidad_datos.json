@@ -1,0 +1,106 @@
+{
+  "generado": "2026-10-03T15:57:00",
+  "filas_bronze": 469734,
+  "filas_subtotal_removidas": 10315,
+  "filas_sin_codigo_removidas": 2192,
+  "filas_duplicadas_removidas": 0,
+  "filas_colapsadas_por_codigo_repetido": 0,
+  "filas_rango_invalido_removidas": 0,
+  "filas_silver": 457227,
+  "pct_registros_territorio_valido": 97.61,
+  "pct_registros_con_poblacion": 97.61,
+  "eventos_unicos": 86,
+  "departamentos_unicos": 35,
+  "cobertura_anios": [
+    2018,
+    2019,
+    2020,
+    2021,
+    2022
+  ],
+  "semanas_por_anio": {
+    "2018": 52,
+    "2019": 52,
+    "2020": 53,
+    "2021": 52,
+    "2022": 52
+  },
+  "casos_por_anio": {
+    "2018": 668606,
+    "2019": 770809,
+    "2020": 626488,
+    "2021": 612561,
+    "2022": 823705
+  },
+  "reconciliacion_totales": {
+    "n_comparaciones": 7245,
+    "n_coinciden": 7245,
+    "pct_coinciden": 100.0,
+    "anios": [
+      2019,
+      2020
+    ]
+  },
+  "eventos_objetivo": {
+    "DENGUE": {
+      "2018": [
+        210
+      ],
+      "2019": [
+        210
+      ],
+      "2020": [
+        210
+      ],
+      "2021": [
+        210
+      ],
+      "2022": [
+        210
+      ]
+    },
+    "IRAG INUSITADA": {
+      "2018": [
+        348
+      ],
+      "2019": [
+        348
+      ],
+      "2020": [
+        348
+      ],
+      "2021": [
+        348
+      ],
+      "2022": [
+        348
+      ]
+    },
+    "TUBERCULOSIS (TODAS LAS FORMAS)": {
+      "2018": [
+        810,
+        820
+      ],
+      "2019": [
+        810,
+        820
+      ],
+      "2020": [
+        810,
+        820
+      ],
+      "2021": [
+        813
+      ],
+      "2022": [
+        810,
+        820
+      ]
+    }
+  },
+  "advertencias": [
+    "La poblacion es constante en todos los anios (misma cifra por departamento 2018-2022): las tasas de incidencia no reflejan el crecimiento poblacional. Usar proyecciones DANE por anio.",
+    "2192 filas de eventos sin codigo en el archivo de origen y sin equivalente en otros anios quedaron fuera del DW: 2020 CHAGAS CRÓNICO (424 filas); 2021 INTOXICACIONES (1768 filas). Se pueden recuperar agregando el codigo en config.CODIGOS_MANUALES.",
+    "11 codigos de evento aparecen con mas de un nombre entre anios (se unifican por codigo, revisar que sean el mismo evento): [113, 205, 298, 340, 348, 352, 357, 370, 500, 550, 875]"
+  ]
+}
